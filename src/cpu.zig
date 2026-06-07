@@ -168,7 +168,7 @@ pub fn opcodePtr(op: Opcode6502) *const fn (*olc6502) u8 {
 
 pub const Instruction = struct { opcode: Opcode6502, address_mode: AddressMode6502, cycles: u8 };
 
-pub const opcode_lookup6502: [16 * 16]Instruction = .{
+pub const opcode_lookup6502: [256]Instruction = .{
     .{ .opcode = Opcode6502.BRK, .address_mode = AddressMode6502.IMM, .cycles = 7 }, .{ .opcode = Opcode6502.ORA, .address_mode = AddressMode6502.IZX, .cycles = 6 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 8 }, .{ .opcode = Opcode6502.NOP, .address_mode = AddressMode6502.IMP, .cycles = 3 }, .{ .opcode = Opcode6502.ORA, .address_mode = AddressMode6502.ZP0, .cycles = 3 }, .{ .opcode = Opcode6502.ASL, .address_mode = AddressMode6502.ZP0, .cycles = 5 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 5 }, .{ .opcode = Opcode6502.PHP, .address_mode = AddressMode6502.IMP, .cycles = 3 }, .{ .opcode = Opcode6502.ORA, .address_mode = AddressMode6502.IMM, .cycles = 2 }, .{ .opcode = Opcode6502.ASL, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.NOP, .address_mode = AddressMode6502.IMP, .cycles = 4 }, .{ .opcode = Opcode6502.ORA, .address_mode = AddressMode6502.ABS, .cycles = 4 }, .{ .opcode = Opcode6502.ASL, .address_mode = AddressMode6502.ABS, .cycles = 6 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 6 },
     .{ .opcode = Opcode6502.BPL, .address_mode = AddressMode6502.REL, .cycles = 2 }, .{ .opcode = Opcode6502.ORA, .address_mode = AddressMode6502.IZY, .cycles = 5 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 8 }, .{ .opcode = Opcode6502.NOP, .address_mode = AddressMode6502.IMP, .cycles = 4 }, .{ .opcode = Opcode6502.ORA, .address_mode = AddressMode6502.ZPX, .cycles = 4 }, .{ .opcode = Opcode6502.ASL, .address_mode = AddressMode6502.ZPX, .cycles = 6 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 6 }, .{ .opcode = Opcode6502.CLC, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.ORA, .address_mode = AddressMode6502.ABY, .cycles = 4 }, .{ .opcode = Opcode6502.NOP, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 7 }, .{ .opcode = Opcode6502.NOP, .address_mode = AddressMode6502.IMP, .cycles = 4 }, .{ .opcode = Opcode6502.ORA, .address_mode = AddressMode6502.ABX, .cycles = 4 }, .{ .opcode = Opcode6502.ASL, .address_mode = AddressMode6502.ABX, .cycles = 7 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 7 },
     .{ .opcode = Opcode6502.JSR, .address_mode = AddressMode6502.ABS, .cycles = 6 }, .{ .opcode = Opcode6502.AND, .address_mode = AddressMode6502.IZX, .cycles = 6 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 8 }, .{ .opcode = Opcode6502.BIT, .address_mode = AddressMode6502.ZP0, .cycles = 3 }, .{ .opcode = Opcode6502.AND, .address_mode = AddressMode6502.ZP0, .cycles = 3 }, .{ .opcode = Opcode6502.ROL, .address_mode = AddressMode6502.ZP0, .cycles = 5 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 5 }, .{ .opcode = Opcode6502.PLP, .address_mode = AddressMode6502.IMP, .cycles = 4 }, .{ .opcode = Opcode6502.AND, .address_mode = AddressMode6502.IMM, .cycles = 2 }, .{ .opcode = Opcode6502.ROL, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 2 }, .{ .opcode = Opcode6502.BIT, .address_mode = AddressMode6502.ABS, .cycles = 4 }, .{ .opcode = Opcode6502.AND, .address_mode = AddressMode6502.ABS, .cycles = 4 }, .{ .opcode = Opcode6502.ROL, .address_mode = AddressMode6502.ABS, .cycles = 6 }, .{ .opcode = Opcode6502.XXX, .address_mode = AddressMode6502.IMP, .cycles = 6 },
@@ -213,11 +213,11 @@ pub const olc6502 = struct {
     }
 
     pub fn read(self: *@This(), a: u16) u8 {
-        return self.bus.read(a, false);
+        return self.bus.cpuRead(a, false);
     }
 
     pub fn write(self: *@This(), a: u16, d: u8) void {
-        self.bus.write(a, d);
+        self.bus.cpuWrite(a, d);
     }
 
     pub fn getFlag(self: *@This(), flag: Flags6502) u8 {
@@ -509,7 +509,7 @@ pub const olc6502 = struct {
     pub fn BNE(self: *@This()) u8 {
         if (self.getFlag(.Z) == 0) {
             self.cycles += 1;
-            self.addr_abs = self.pc + self.addr_rel;
+            self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
                 self.cycles += 1;
             self.pc = self.addr_abs;
@@ -622,7 +622,7 @@ pub const olc6502 = struct {
     }
 
     pub fn DEX(self: *@This()) u8 {
-        self.x -= 1;
+        self.x -%= 1;
         self.setFlag(.Z, self.x == 0x00);
         self.setFlag(.N, self.x & 0x80 != 0);
         return 0;
