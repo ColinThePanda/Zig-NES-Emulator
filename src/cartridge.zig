@@ -1,7 +1,7 @@
 const std = @import("std");
 const Mapper = @import("mapper.zig").Mapper;
 
-const inesHeader = struct {
+const inesHeader = extern struct { // extern so fields are placed in memory in this exact order
     name: [4]u8,
     program_rom_chunks: u8,
     char_rom_chunks: u8,
@@ -12,6 +12,8 @@ const inesHeader = struct {
     tv_system2: u8,
     unused: [5]u8,
 };
+
+pub const Mirror = enum { horizontal, vertical, onescreen_lo, onescreen_hi };
 
 pub const Cartridge = struct {
     io: std.Io,
@@ -26,6 +28,8 @@ pub const Cartridge = struct {
     char_memory: []u8,
 
     mapper: Mapper,
+
+    mirror: Mirror = .horizontal,
 
     pub fn init(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !@This() {
         const file = try std.Io.Dir.cwd().openFile(io, path, .{});
@@ -52,6 +56,7 @@ pub const Cartridge = struct {
             .program_memory = undefined,
             .char_memory = undefined,
             .mapper = undefined,
+            .mirror = if (header.mapper1 & 0x01 != 0) .vertical else .horizontal,
         };
 
         switch (filetype) {
@@ -117,7 +122,7 @@ pub const Cartridge = struct {
 
     pub fn ppuWrite(self: *@This(), addr: u16, data: u8) bool {
         var mapped_addr: u32 = undefined;
-        if (self.mapper.ppuMapRead(addr, &mapped_addr)) {
+        if (self.mapper.ppuMapWrite(addr, &mapped_addr)) {
             self.char_memory[mapped_addr] = data;
             return true;
         }

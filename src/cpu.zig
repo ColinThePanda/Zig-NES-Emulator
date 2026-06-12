@@ -292,18 +292,18 @@ pub const olc6502 = struct {
             self.opcode = self.read(self.pc);
 
             self.setFlag(.U, true);
-            self.pc += 1;
+            self.pc +%= 1;
 
             const instruction = opcode_lookup6502[self.opcode];
             self.cycles = instruction.cycles;
             const additional_cycle1: u8 = addressModePtr(instruction.address_mode)(self);
             const additional_cycle2: u8 = opcodePtr(instruction.opcode)(self);
-            self.cycles += (additional_cycle1 & additional_cycle2);
+            self.cycles +%= (additional_cycle1 & additional_cycle2);
             self.setFlag(.U, true);
         }
 
         self.clock_count += 1;
-        self.cycles -= 1;
+        self.cycles -%= 1;
     }
 
     pub fn fetch(self: *@This()) u8 {
@@ -320,53 +320,53 @@ pub const olc6502 = struct {
 
     pub fn IMM(self: *@This()) u8 {
         self.addr_abs = self.pc;
-        self.pc += 1;
+        self.pc +%= 1;
         return 0;
     }
 
     pub fn ZP0(self: *@This()) u8 {
         self.addr_abs = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
         self.addr_abs &= 0x00FF;
         return 0;
     }
 
     pub fn ZPX(self: *@This()) u8 {
-        self.addr_abs = self.read(self.pc) + self.x;
-        self.pc += 1;
+        self.addr_abs = self.read(self.pc) +% self.x;
+        self.pc +%= 1;
         self.addr_abs &= 0x00FF;
         return 0;
     }
 
     pub fn ZPY(self: *@This()) u8 {
-        self.addr_abs = self.read(self.pc) + self.y;
-        self.pc += 1;
+        self.addr_abs = self.read(self.pc) +% self.y;
+        self.pc +%= 1;
         self.addr_abs &= 0x00FF;
         return 0;
     }
 
     pub fn REL(self: *@This()) u8 {
         self.addr_rel = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
         if (self.addr_rel & 0x80 != 0) self.addr_rel |= 0xFF00;
         return 0;
     }
 
     pub fn ABS(self: *@This()) u8 {
         const lo: u16 = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
         const hi: u16 = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
         self.addr_abs = (hi << 8) | lo;
         return 0;
     }
 
     pub fn ABX(self: *@This()) u8 {
         const lo: u16 = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
         const hi: u16 = self.read(self.pc);
-        self.pc += 1;
-        self.addr_abs = ((hi << 8) | lo) + self.x;
+        self.pc +%= 1;
+        self.addr_abs = ((hi << 8) | lo) +% self.x;
         if ((self.addr_abs & 0xFF00) != (hi << 8))
             return 1;
         return 0;
@@ -374,10 +374,10 @@ pub const olc6502 = struct {
 
     pub fn ABY(self: *@This()) u8 {
         const lo: u16 = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
         const hi: u16 = self.read(self.pc);
-        self.pc += 1;
-        self.addr_abs = ((hi << 8) | lo) + self.y;
+        self.pc +%= 1;
+        self.addr_abs = ((hi << 8) | lo) +% self.y;
         if ((self.addr_abs & 0xFF00) != (hi << 8))
             return 1;
         return 0;
@@ -385,9 +385,9 @@ pub const olc6502 = struct {
 
     pub fn IND(self: *@This()) u8 {
         const lo: u16 = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
         const hi: u16 = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
         const ptr: u16 = (hi << 8) | lo;
 
         if (lo == 0x00FF) // Simulate page boundry hardware bug
@@ -400,7 +400,7 @@ pub const olc6502 = struct {
 
     pub fn IZX(self: *@This()) u8 {
         const t: u16 = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
 
         const lo: u16 = self.read((t + @as(u16, self.x)) & 0x00FF);
         const hi: u16 = self.read((t + @as(u16, self.x) + 1) & 0x00FF);
@@ -410,11 +410,11 @@ pub const olc6502 = struct {
 
     pub fn IZY(self: *@This()) u8 {
         const t: u16 = self.read(self.pc);
-        self.pc += 1;
+        self.pc +%= 1;
 
         const lo: u16 = self.read(t & 0x00FF);
         const hi: u16 = self.read((t + 1) & 0x00FF);
-        self.addr_abs = ((hi << 8) | lo) + self.y;
+        self.addr_abs = ((hi << 8) | lo) +% self.y;
         if ((self.addr_abs & 0xFF00) != (hi << 8))
             return 1;
         return 0;
@@ -455,10 +455,10 @@ pub const olc6502 = struct {
 
     pub fn BCC(self: *@This()) u8 {
         if (self.getFlag(.C) == 0) {
-            self.cycles += 1;
-            self.addr_abs = self.pc + self.addr_rel;
+            self.cycles +%= 1;
+            self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
-                self.cycles += 1;
+                self.cycles +%= 1;
             self.pc = self.addr_abs;
         }
         return 0;
@@ -466,10 +466,10 @@ pub const olc6502 = struct {
 
     pub fn BCS(self: *@This()) u8 {
         if (self.getFlag(.C) == 1) {
-            self.cycles += 1;
-            self.addr_abs = self.pc + self.addr_rel;
+            self.cycles +%= 1;
+            self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
-                self.cycles += 1;
+                self.cycles +%= 1;
             self.pc = self.addr_abs;
         }
         return 0;
@@ -477,10 +477,10 @@ pub const olc6502 = struct {
 
     pub fn BEQ(self: *@This()) u8 {
         if (self.getFlag(.Z) == 1) {
-            self.cycles += 1;
-            self.addr_abs = self.pc + self.addr_rel;
+            self.cycles +%= 1;
+            self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
-                self.cycles += 1;
+                self.cycles +%= 1;
             self.pc = self.addr_abs;
         }
         return 0;
@@ -497,10 +497,10 @@ pub const olc6502 = struct {
 
     pub fn BMI(self: *@This()) u8 {
         if (self.getFlag(.N) == 1) {
-            self.cycles += 1;
-            self.addr_abs = self.pc + self.addr_rel;
+            self.cycles +%= 1;
+            self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
-                self.cycles += 1;
+                self.cycles +%= 1;
             self.pc = self.addr_abs;
         }
         return 0;
@@ -508,36 +508,36 @@ pub const olc6502 = struct {
 
     pub fn BNE(self: *@This()) u8 {
         if (self.getFlag(.Z) == 0) {
-            self.cycles += 1;
+            self.cycles +%= 1;
             self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
-                self.cycles += 1;
+                self.cycles +%= 1;
             self.pc = self.addr_abs;
         }
         return 0;
     }
 
     pub fn BPL(self: *@This()) u8 {
-        if (self.getFlag(.Z) == 0) {
-            self.cycles += 1;
-            self.addr_abs = self.pc + self.addr_rel;
+        if (self.getFlag(.N) == 0) {
+            self.cycles +%= 1;
+            self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
-                self.cycles += 1;
+                self.cycles +%= 1;
             self.pc = self.addr_abs;
         }
         return 0;
     }
 
     pub fn BRK(self: *@This()) u8 {
-        self.pc += 1;
+        self.pc +%= 1;
         self.setFlag(.I, true);
         self.write(0x0100 + @as(u16, self.sp), @truncate((self.pc >> 8) & 0x00FF));
-        self.sp -= 1;
-        self.write(0x0100 + @as(u16, self.sp), @truncate(self.pc >> 8));
-        self.sp -= 1;
+        self.sp -%= 1;
+        self.write(0x0100 + @as(u16, self.sp), @truncate(self.pc & 0x00FF));
+        self.sp -%= 1;
         self.setFlag(.B, true);
         self.write(0x0100 + @as(u16, self.sp), self.status);
-        self.sp -= 1;
+        self.sp -%= 1;
         self.setFlag(.B, false);
         self.pc = @as(u16, self.read(0xFFFE)) | (@as(u16, self.read(0xFFFF)) << 8);
         return 0;
@@ -545,10 +545,10 @@ pub const olc6502 = struct {
 
     pub fn BVC(self: *@This()) u8 {
         if (self.getFlag(.V) == 0) {
-            self.cycles += 1;
-            self.addr_abs = self.pc + self.addr_rel;
+            self.cycles +%= 1;
+            self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
-                self.cycles += 1;
+                self.cycles +%= 1;
             self.pc = self.addr_abs;
         }
         return 0;
@@ -556,10 +556,10 @@ pub const olc6502 = struct {
 
     pub fn BVS(self: *@This()) u8 {
         if (self.getFlag(.V) == 1) {
-            self.cycles += 1;
-            self.addr_abs = self.pc + self.addr_rel;
+            self.cycles +%= 1;
+            self.addr_abs = self.pc +% self.addr_rel;
             if ((self.addr_abs & 0xFF00) != (self.pc & 0xFF00))
-                self.cycles += 1;
+                self.cycles +%= 1;
             self.pc = self.addr_abs;
         }
         return 0;
@@ -587,7 +587,7 @@ pub const olc6502 = struct {
 
     pub fn CMP(self: *@This()) u8 {
         _ = self.fetch();
-        self.temp = @as(u16, self.a) - @as(u16, self.fetched);
+        self.temp = @as(u16, self.a) -% @as(u16, self.fetched);
         self.setFlag(.C, self.a >= self.fetched);
         self.setFlag(.Z, self.temp & 0x00FF == 0x0000);
         self.setFlag(.N, self.temp & 0x0080 != 0);
@@ -596,7 +596,7 @@ pub const olc6502 = struct {
 
     pub fn CPX(self: *@This()) u8 {
         _ = self.fetch();
-        self.temp = @as(u16, self.x) - @as(u16, self.fetched);
+        self.temp = @as(u16, self.x) -% @as(u16, self.fetched);
         self.setFlag(.C, self.x >= self.fetched);
         self.setFlag(.Z, self.temp & 0x00FF == 0x0000);
         self.setFlag(.N, self.temp & 0x0080 != 0);
@@ -605,7 +605,7 @@ pub const olc6502 = struct {
 
     pub fn CPY(self: *@This()) u8 {
         _ = self.fetch();
-        self.temp = @as(u16, self.y) - @as(u16, self.fetched);
+        self.temp = @as(u16, self.y) -% @as(u16, self.fetched);
         self.setFlag(.C, self.y >= self.fetched);
         self.setFlag(.Z, self.temp & 0x00FF == 0x0000);
         self.setFlag(.N, self.temp & 0x0080 != 0);
@@ -614,7 +614,7 @@ pub const olc6502 = struct {
 
     pub fn DEC(self: *@This()) u8 {
         _ = self.fetch();
-        self.temp = self.fetched - 1;
+        self.temp = self.fetched -% 1;
         self.write(self.addr_abs, @truncate(self.temp & 0x00FF));
         self.setFlag(.Z, self.temp & 0x00FF == 0x0000);
         self.setFlag(.N, self.temp & 0x0080 != 0);
@@ -629,7 +629,7 @@ pub const olc6502 = struct {
     }
 
     pub fn DEY(self: *@This()) u8 {
-        self.y -= 1;
+        self.y -%= 1;
         self.setFlag(.Z, self.y == 0x00);
         self.setFlag(.N, self.y & 0x80 != 0);
         return 0;
@@ -645,7 +645,7 @@ pub const olc6502 = struct {
 
     pub fn INC(self: *@This()) u8 {
         _ = self.fetch();
-        self.temp = self.fetched + 1;
+        self.temp = self.fetched +% 1;
         self.write(self.addr_abs, @truncate(self.temp & 0x00FF));
         self.setFlag(.Z, self.temp & 0x00FF == 0x0000);
         self.setFlag(.N, self.temp & 0x0080 != 0);
@@ -653,14 +653,14 @@ pub const olc6502 = struct {
     }
 
     pub fn INX(self: *@This()) u8 {
-        self.x += 1;
+        self.x +%= 1;
         self.setFlag(.Z, self.x == 0x00);
         self.setFlag(.N, self.x & 0x80 != 0);
         return 0;
     }
 
     pub fn INY(self: *@This()) u8 {
-        self.y += 1;
+        self.y +%= 1;
         self.setFlag(.Z, self.y == 0x00);
         self.setFlag(.N, self.y & 0x80 != 0);
         return 0;
@@ -672,11 +672,11 @@ pub const olc6502 = struct {
     }
 
     pub fn JSR(self: *@This()) u8 {
-        self.pc -= 1;
+        self.pc -%= 1;
         self.write(0x0100 + @as(u16, self.sp), @truncate((self.pc >> 8) & 0x00FF));
-        self.sp -= 1;
+        self.sp -%= 1;
         self.write(0x0100 + @as(u16, self.sp), @truncate(self.pc & 0x00FF));
-        self.sp -= 1;
+        self.sp -%= 1;
         self.pc = self.addr_abs;
         return 0;
     }
@@ -735,7 +735,7 @@ pub const olc6502 = struct {
 
     pub fn PHA(self: *@This()) u8 {
         self.write(0x0100 + @as(u16, self.sp), self.a);
-        self.sp -= 1;
+        self.sp -%= 1;
         return 0;
     }
 
@@ -743,12 +743,12 @@ pub const olc6502 = struct {
         self.write(0x0100 + @as(u16, self.sp), self.status | @intFromEnum(Flags6502.B) | @intFromEnum(Flags6502.U));
         self.setFlag(.B, false);
         self.setFlag(.U, false);
-        self.sp -= 1;
+        self.sp -%= 1;
         return 0;
     }
 
     pub fn PLA(self: *@This()) u8 {
-        self.sp += 1;
+        self.sp +%= 1;
         self.a = self.read(0x0100 + @as(u16, self.sp));
         self.setFlag(.Z, self.a == 0x00);
         self.setFlag(.N, self.a & 0x80 != 0);
@@ -756,7 +756,7 @@ pub const olc6502 = struct {
     }
 
     pub fn PLP(self: *@This()) u8 {
-        self.sp += 1;
+        self.sp +%= 1;
         self.status = self.read(0x0100 + @as(u16, self.sp));
         self.setFlag(.U, true);
         return 0;
@@ -789,23 +789,23 @@ pub const olc6502 = struct {
     }
 
     pub fn RTI(self: *@This()) u8 {
-        self.sp += 1;
+        self.sp +%= 1;
         self.status = self.read(0x0100 + @as(u16, self.sp));
         self.status &= ~@intFromEnum(Flags6502.B);
         self.status &= ~@intFromEnum(Flags6502.U);
-        self.sp += 1;
+        self.sp +%= 1;
         self.pc = @intCast(self.read(0x0100 + @as(u16, self.sp)));
-        self.sp += 1;
+        self.sp +%= 1;
         self.pc |= @as(u16, self.read(0x0100 + @as(u16, self.sp))) << 8;
         return 0;
     }
 
     pub fn RTS(self: *@This()) u8 {
-        self.sp += 1;
+        self.sp +%= 1;
         self.pc = @intCast(self.read(0x0100 + @as(u16, self.sp)));
-        self.sp += 1;
+        self.sp +%= 1;
         self.pc |= @as(u16, self.read(0x0100 + @as(u16, self.sp))) << 8;
-        self.pc += 1;
+        self.pc +%= 1;
         return 0;
     }
 
@@ -894,5 +894,9 @@ pub const olc6502 = struct {
     pub fn XXX(self: *@This()) u8 {
         _ = self;
         return 0;
+    }
+
+    pub fn complete(self: *@This()) bool {
+        return self.cycles == 0;
     }
 };
