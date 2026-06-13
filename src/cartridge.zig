@@ -65,9 +65,9 @@ pub const Cartridge = struct {
                 const program_banks = header.program_rom_chunks;
                 const char_banks = header.char_rom_chunks;
                 const program_memory = try allocator.alloc(u8, @as(usize, program_banks) * 16384);
-                const char_memory = try allocator.alloc(u8, @as(usize, char_banks) * 8192);
+                const char_memory = try allocator.alloc(u8, if (char_banks == 0) 8192 else @as(usize, char_banks) * 8192);
                 _ = try reader.interface.readSliceAll(program_memory);
-                _ = try reader.interface.readSliceAll(char_memory);
+                if (char_banks > 0) _ = try reader.interface.readSliceAll(char_memory);
 
                 cartridge.program_banks = program_banks;
                 cartridge.char_banks = char_banks;
@@ -79,7 +79,7 @@ pub const Cartridge = struct {
         }
 
         switch (mapper_id) {
-            0 => {
+            0, 1, 2, 3, 4, 66 => {
                 cartridge.mapper = try Mapper.init(mapper_id, cartridge.program_banks, cartridge.char_banks);
             },
             else => return error.UnsupportedMapper,
@@ -94,8 +94,9 @@ pub const Cartridge = struct {
     }
 
     pub fn cpuRead(self: *@This(), addr: u16, data: *u8) bool {
-        var mapped_addr: u32 = undefined;
-        if (self.mapper.cpuMapRead(addr, &mapped_addr)) {
+        var mapped_addr: u32 = 0;
+        if (self.mapper.cpuMapRead(addr, &mapped_addr, data)) {
+            if (mapped_addr == 0xFFFFFFFF) return true;
             data.* = self.program_memory[mapped_addr];
             return true;
         }
@@ -103,8 +104,9 @@ pub const Cartridge = struct {
     }
 
     pub fn cpuWrite(self: *@This(), addr: u16, data: u8) bool {
-        var mapped_addr: u32 = undefined;
-        if (self.mapper.cpuMapWrite(addr, &mapped_addr)) {
+        var mapped_addr: u32 = 0;
+        if (self.mapper.cpuMapWrite(addr, &mapped_addr, data)) {
+            if (mapped_addr == 0xFFFFFFFF) return true;
             self.program_memory[mapped_addr] = data;
             return true;
         }
@@ -127,5 +129,9 @@ pub const Cartridge = struct {
             return true;
         }
         return false;
+    }
+
+    pub fn currentMirror(self: *@This()) Mirror {
+        return self.mapper.mirror() orelse self.mirror;
     }
 };

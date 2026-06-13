@@ -121,6 +121,8 @@ pub const olc2C02 = struct {
     palette_table: [32]u8 = @splat(0),
     pattern_table: [2][4096]u8 = @splat(@as([4096]u8, @splat(0))),
 
+    framebuffer: [256 * 240]rl.Color = undefined,
+
     palette_screen: [0x40]rl.Color,
     sprite_screen: rl.Image,
     sprite_name_table: [2]rl.Image,
@@ -279,7 +281,8 @@ pub const olc2C02 = struct {
         } else if (address >= 0x2000 and address <= 0x3EFF) {
             address &= 0x0FFF;
 
-            if (self.cartridge.mirror == .vertical) {
+            const mir = self.cartridge.currentMirror();
+            if (mir == .vertical) {
                 if (address >= 0x0000 and address <= 0x03FF)
                     return self.name_table[0][address & 0x03FF];
                 if (address >= 0x0400 and address <= 0x07FF)
@@ -288,7 +291,7 @@ pub const olc2C02 = struct {
                     return self.name_table[0][address & 0x03FF];
                 if (address >= 0x0C00 and address <= 0x0FFF)
                     return self.name_table[1][address & 0x03FF];
-            } else if (self.cartridge.mirror == .horizontal) {
+            } else if (mir == .horizontal) {
                 if (address >= 0x0000 and address <= 0x03FF)
                     return self.name_table[0][address & 0x03FF];
                 if (address >= 0x0400 and address <= 0x07FF)
@@ -297,6 +300,10 @@ pub const olc2C02 = struct {
                     return self.name_table[1][address & 0x03FF];
                 if (address >= 0x0C00 and address <= 0x0FFF)
                     return self.name_table[1][address & 0x03FF];
+            } else if (mir == .onescreen_lo) {
+                return self.name_table[0][address & 0x03FF];
+            } else if (mir == .onescreen_hi) {
+                return self.name_table[1][address & 0x03FF];
             }
         } else if (address >= 0x3F00 and address <= 0x3FFF) {
             address &= 0x001F;
@@ -478,6 +485,7 @@ pub const olc2C02 = struct {
     }
 
     pub fn clock(self: *@This()) void {
+        @setRuntimeSafety(false);
         if (self.scanline >= -1 and self.scanline < 240) {
             if (self.scanline == 0 and self.cycle == 0) {
                 self.cycle = 1;
@@ -521,6 +529,10 @@ pub const olc2C02 = struct {
             if (self.cycle == 257) {
                 self.loadBackgroundShifters();
                 self.transferAddressX();
+            }
+
+            if (self.cycle == 260 and self.scanline < 240 and (self.mask.render_background != 0 or self.mask.render_sprites != 0)) {
+                self.cartridge.mapper.scanline();
             }
 
             if (self.cycle == 338 or self.cycle == 340) {
@@ -690,7 +702,11 @@ pub const olc2C02 = struct {
             }
         }
 
-        rl.imageDrawPixel(&self.sprite_screen, self.cycle - 1, self.scanline, self.getColourFromPaletteRam(palette, pixel));
+        const x = self.cycle - 1;
+        const y = self.scanline;
+        if (x >= 0 and x < 256 and y >= 0 and y < 240) {
+            self.framebuffer[@as(usize, @intCast(y)) * 256 + @as(usize, @intCast(x))] = self.getColourFromPaletteRam(palette, pixel);
+        }
 
         self.cycle += 1;
         if (self.cycle >= 341) {

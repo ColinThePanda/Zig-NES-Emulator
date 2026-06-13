@@ -288,6 +288,7 @@ pub const olc6502 = struct {
     }
 
     pub fn clock(self: *@This()) void {
+        @setRuntimeSafety(false);
         if (self.cycles == 0) {
             self.opcode = self.read(self.pc);
 

@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+    const optimize = b.option(std.builtin.OptimizeMode, "optimize", "optimization mode") orelse .ReleaseFast;
 
     const raylib_dep = b.dependency("raylib_zig", .{
         .target = target,
@@ -12,11 +12,22 @@ pub fn build(b: *std.Build) void {
     const raylib = raylib_dep.module("raylib");
     const raylib_artifact = raylib_dep.artifact("raylib");
 
+    const blip_mod = b.createModule(.{
+        .root_source_file = b.path("extern/blip_buf/blip_buf.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .sanitize_c = .off,
+    });
+    blip_mod.addCSourceFile(.{ .file = b.path("extern/blip_buf/blip_buf.c"), .flags = &.{"-fwrapv"} });
+
     const mod = b.addModule("zig_nes_emu", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
+        .optimize = optimize,
         .imports = &.{
             .{ .name = "raylib", .module = raylib },
+            .{ .name = "blip", .module = blip_mod },
         },
     });
     mod.linkLibrary(raylib_artifact);
@@ -30,6 +41,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "zig_nes_emu", .module = mod },
                 .{ .name = "raylib", .module = raylib },
+                .{ .name = "blip", .module = blip_mod },
             },
         }),
     });
