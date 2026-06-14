@@ -1,4 +1,5 @@
 const std = @import("std");
+const Region = @import("bus.zig").Region;
 
 const length_table_2A03 = [32]u8{
     10, 254, 20, 2,  40, 4,  80, 6,  160, 8,  60, 10, 14, 12, 26, 14,
@@ -163,8 +164,12 @@ pub const olc2A03 = struct {
 
     five_step: bool = false,
 
-    pub fn init() @This() {
-        return @This(){};
+    region: Region,
+
+    pub fn init(region: Region) @This() {
+        return @This(){
+            .region = region,
+        };
     }
 
     fn clockQuarter(self: *@This()) void {
@@ -248,7 +253,7 @@ pub const olc2A03 = struct {
             },
             0x400E => {
                 self.noise.mode = data & 0x80 != 0;
-                self.noise.reload = noise_period_table[data & 0x0F];
+                self.noise.reload = self.region.noisePeriods()[data & 0x0F];
             },
             0x400F => {
                 self.noise.env.start = true;
@@ -291,16 +296,17 @@ pub const olc2A03 = struct {
         var quarter_frame_clock = false;
         var half_frame_clock = false;
 
-        if (self.clock_counter % 6 == 0) {
+        if (self.clock_counter % 2 == 0) {
             self.frame_clock_counter += 1;
 
             if (!self.five_step) {
-                if (self.frame_clock_counter == 3729 or self.frame_clock_counter == 11186) quarter_frame_clock = true;
-                if (self.frame_clock_counter == 7457) {
+                const seq = self.region.frameSeq();
+                if (self.frame_clock_counter == seq[0] or self.frame_clock_counter == seq[2]) quarter_frame_clock = true;
+                if (self.frame_clock_counter == seq[1]) {
                     quarter_frame_clock = true;
                     half_frame_clock = true;
                 }
-                if (self.frame_clock_counter == 14915) {
+                if (self.frame_clock_counter == seq[3]) {
                     quarter_frame_clock = true;
                     half_frame_clock = true;
                     self.frame_clock_counter = 0;
@@ -325,17 +331,14 @@ pub const olc2A03 = struct {
             self.pulse2.clockTimer();
         }
 
-        if (self.clock_counter % 3 == 0) {
-            if (self.tri_linear_counter > 0 and self.tri_lc.counter > 0 and self.tri_reload >= 2) {
-                self.tri_timer -%= 1;
-                if (self.tri_timer == 0xFFFF) {
-                    self.tri_timer = self.tri_reload;
-                    self.tri_step +%= 1;
-                }
+        if (self.tri_linear_counter > 0 and self.tri_lc.counter > 0 and self.tri_reload >= 2) {
+            self.tri_timer -%= 1;
+            if (self.tri_timer == 0xFFFF) {
+                self.tri_timer = self.tri_reload;
+                self.tri_step +%= 1;
             }
-
-            self.noise.clockTimer();
         }
+        self.noise.clockTimer();
 
         self.clock_counter += 1;
     }

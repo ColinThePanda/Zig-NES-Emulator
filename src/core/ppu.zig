@@ -1,5 +1,6 @@
 const std = @import("std");
 const Cartridge = @import("cartridge.zig").Cartridge;
+const Region = @import("bus.zig").Region;
 const rl = @import("raylib");
 
 const Status2C02 = packed struct {
@@ -168,12 +169,15 @@ pub const olc2C02 = struct {
     nmi_count: u32 = 0,
     frame_count: u32 = 0,
 
-    pub fn init() @This() {
+    region: Region,
+
+    pub fn init(region: Region) @This() {
         return @This(){
             .palette_screen = nes_system_palette,
             .sprite_screen = rl.genImageColor(256, 240, rl.Color.black),
             .sprite_name_table = .{ rl.genImageColor(256, 240, rl.Color.black), rl.genImageColor(256, 240, rl.Color.black) },
             .sprite_pattern_table = .{ rl.genImageColor(128, 128, rl.Color.black), rl.genImageColor(128, 128, rl.Color.black) },
+            .region = region,
         };
     }
 
@@ -551,6 +555,7 @@ pub const olc2C02 = struct {
                     self.sprite_shifter_pattern_lo[i] = 0;
                     self.sprite_shifter_pattern_hi[i] = 0;
                 }
+                self.sprite_zero_hit_possible = false;
 
                 var oam_entry: u8 = 0;
                 while (oam_entry < 64 and self.sprite_count < 9) : (oam_entry += 1) {
@@ -712,10 +717,9 @@ pub const olc2C02 = struct {
         if (self.cycle >= 341) {
             self.cycle = 0;
             self.scanline += 1;
-            if (self.scanline >= 261) {
+            if (self.scanline >= self.region.scanlinesPerFrame()) {
                 self.scanline = -1;
                 self.frame_complete = true;
-                self.frame_count += 1;
             }
         }
     }

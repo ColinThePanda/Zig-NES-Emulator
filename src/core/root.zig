@@ -10,6 +10,7 @@ pub const opcode_lookup6502 = cpu.opcode_lookup6502;
 
 pub const bus = @import("bus.zig");
 pub const Bus = bus.Bus;
+pub const Region = bus.Region;
 
 pub const ppu = @import("ppu.zig");
 pub const olc2C02 = ppu.olc2C02;

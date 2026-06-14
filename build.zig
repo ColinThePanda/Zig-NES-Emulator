@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
     blip_mod.addCSourceFile(.{ .file = b.path("extern/blip_buf/blip_buf.c"), .flags = &.{"-fwrapv"} });
 
     const mod = b.addModule("zig_nes_emu", .{
-        .root_source_file = b.path("src/root.zig"),
+        .root_source_file = b.path("src/core/root.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
@@ -32,10 +32,12 @@ pub fn build(b: *std.Build) void {
     });
     mod.linkLibrary(raylib_artifact);
 
-    const exe = b.addExecutable(.{
-        .name = "zig_nes_emu",
+    const mibu_dep = b.dependency("mibu", .{});
+
+    const window_exe = b.addExecutable(.{
+        .name = "window_nes_emu",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
+            .root_source_file = b.path("src/window_main.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -45,32 +47,42 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    window_exe.root_module.linkLibrary(raylib_artifact);
+    window_exe.root_module.addImport("mibu", mibu_dep.module("mibu"));
 
-    exe.root_module.linkLibrary(raylib_artifact);
+    const window_step = b.step("window", "Compile the window GUI emulator binary");
+    window_step.dependOn(&b.addInstallArtifact(window_exe, .{}).step);
 
-    b.installArtifact(exe);
+    const run_window_cmd = b.addRunArtifact(window_exe);
+    run_window_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| run_window_cmd.addArgs(args);
 
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
+    const run_window_step = b.step("run-window", "Compile and run the window GUI emulator");
+    run_window_step.dependOn(&run_window_cmd.step);
 
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
-
-    const mod_tests = b.addTest(.{
-        .root_module = mod,
+    const terminal_exe = b.addExecutable(.{
+        .name = "terminal_nes_emu",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/terminal_main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zig_nes_emu", .module = mod },
+                .{ .name = "raylib", .module = raylib },
+                .{ .name = "blip", .module = blip_mod },
+            },
+        }),
     });
-    const run_mod_tests = b.addRunArtifact(mod_tests);
+    terminal_exe.root_module.linkLibrary(raylib_artifact);
+    terminal_exe.root_module.addImport("mibu", mibu_dep.module("mibu"));
 
-    const exe_tests = b.addTest(.{
-        .root_module = exe.root_module,
-    });
-    const run_exe_tests = b.addRunArtifact(exe_tests);
+    const terminal_step = b.step("terminal", "Compile the text terminal emulator binary");
+    terminal_step.dependOn(&b.addInstallArtifact(terminal_exe, .{}).step);
 
-    const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_exe_tests.step);
+    const run_terminal_cmd = b.addRunArtifact(terminal_exe);
+    run_terminal_cmd.step.dependOn(b.getInstallStep());
+    if (b.args) |args| run_terminal_cmd.addArgs(args);
+
+    const run_terminal_step = b.step("run-terminal", "Compile and run the text terminal emulator");
+    run_terminal_step.dependOn(&run_terminal_cmd.step);
 }
