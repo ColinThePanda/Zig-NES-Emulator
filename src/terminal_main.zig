@@ -5,6 +5,8 @@ const blip = @import("blip");
 const rl = @import("raylib");
 const mibu = @import("mibu");
 
+const Color = zig_nes_emu.Color;
+
 const sample_rate = 44100;
 const chunk_frames = 1024;
 
@@ -119,7 +121,7 @@ fn printUsage() void {
     std.debug.print("{s}", .{usage});
 }
 
-fn colorEq(a: rl.Color, b: rl.Color) bool {
+fn colorEq(a: Color, b: Color) bool {
     return a.r == b.r and a.g == b.g and a.b == b.b;
 }
 
@@ -293,7 +295,7 @@ const TerminalWriter = struct {
         }
     }
 
-    fn averageBlock(framebuffer: *const [256 * 240]rl.Color, x0: usize, y0: usize, block_size: usize) rl.Color {
+    fn averageBlock(framebuffer: *const [256 * 240]Color, x0: usize, y0: usize, block_size: usize) Color {
         const width = 256;
         const height = 240;
         var r: u32 = 0;
@@ -315,8 +317,8 @@ const TerminalWriter = struct {
                 count += 1;
             }
         }
-        if (count == 0) return rl.Color{ .r = 0, .g = 0, .b = 0, .a = 255 };
-        return rl.Color{
+        if (count == 0) return Color{ .r = 0, .g = 0, .b = 0, .a = 255 };
+        return Color{
             .r = @intCast(r / count),
             .g = @intCast(g / count),
             .b = @intCast(b / count),
@@ -347,7 +349,7 @@ const TerminalWriter = struct {
         i.* += s.len;
     }
 
-    pub fn writeFrame(self: *@This(), scratch: []u8, framebuffer: *const [256 * 240]rl.Color, block_size: u32) !void {
+    pub fn writeFrame(self: *@This(), scratch: []u8, framebuffer: *const [256 * 240]Color, block_size: u32) !void {
         const bs: usize = @max(1, block_size);
         const row_stride = bs * 2;
         var i: usize = 0;
@@ -356,8 +358,8 @@ const TerminalWriter = struct {
 
         var y: usize = 0;
         while (y + row_stride <= 240) : (y += row_stride) {
-            var last_top: ?rl.Color = null;
-            var last_bot: ?rl.Color = null;
+            var last_top: ?Color = null;
+            var last_bot: ?Color = null;
             var x: usize = 0;
             while (x + bs <= 256) : (x += bs) {
                 const top = averageBlock(framebuffer, x, y, bs);

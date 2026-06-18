@@ -1,7 +1,13 @@
 const std = @import("std");
 const Cartridge = @import("cartridge.zig").Cartridge;
 const Region = @import("bus.zig").Region;
-const rl = @import("raylib");
+
+pub const Color = extern struct {
+    r: u8 = 0,
+    g: u8 = 0,
+    b: u8 = 0,
+    a: u8 = 255,
+};
 
 const Status2C02 = packed struct {
     unused: u5 = 0,
@@ -48,7 +54,7 @@ const ObjectAttributeEntry = extern struct {
     x: u8 = 0,
 };
 
-pub const nes_system_palette: [0x40]rl.Color = .{
+pub const nes_system_palette: [0x40]Color = .{
     .{ .r = 84, .g = 84, .b = 84, .a = 255 },
     .{ .r = 0, .g = 30, .b = 116, .a = 255 },
     .{ .r = 8, .g = 16, .b = 144, .a = 255 },
@@ -122,12 +128,9 @@ pub const olc2C02 = struct {
     palette_table: [32]u8 = @splat(0),
     pattern_table: [2][4096]u8 = @splat(@as([4096]u8, @splat(0))),
 
-    framebuffer: [256 * 240]rl.Color = undefined,
+    framebuffer: [256 * 240]Color = undefined,
 
-    palette_screen: [0x40]rl.Color,
-    sprite_screen: rl.Image,
-    sprite_name_table: [2]rl.Image,
-    sprite_pattern_table: [2]rl.Image,
+    palette_screen: [0x40]Color,
 
     vram_addr: LoopyRegister = .{},
     tram_addr: LoopyRegister = .{},
@@ -174,17 +177,12 @@ pub const olc2C02 = struct {
     pub fn init(region: Region) @This() {
         return @This(){
             .palette_screen = nes_system_palette,
-            .sprite_screen = rl.genImageColor(256, 240, rl.Color.black),
-            .sprite_name_table = .{ rl.genImageColor(256, 240, rl.Color.black), rl.genImageColor(256, 240, rl.Color.black) },
-            .sprite_pattern_table = .{ rl.genImageColor(128, 128, rl.Color.black), rl.genImageColor(128, 128, rl.Color.black) },
             .region = region,
         };
     }
 
     pub fn deinit(self: *@This()) void {
-        rl.unloadImage(self.sprite_screen);
-        for (self.sprite_name_table) |img| rl.unloadImage(img);
-        for (self.sprite_pattern_table) |img| rl.unloadImage(img);
+        _ = self;
     }
 
     pub fn oamBytes(self: *@This()) []u8 {
@@ -385,33 +383,7 @@ pub const olc2C02 = struct {
         self.tram_addr = @bitCast(@as(u16, 0x0000));
     }
 
-    pub fn getPatternTable(self: *@This(), i: u8, palette: u8) rl.Image {
-        for (0..16) |tile_y_usize| {
-            const tile_y = @as(u16, @intCast(tile_y_usize));
-            for (0..16) |tile_x_usize| {
-                const tile_x = @as(u16, @intCast(tile_x_usize));
-                const offset: u16 = tile_y * 256 + tile_x * 16;
-
-                for (0..8) |row_usize| {
-                    const row = @as(u16, @intCast(row_usize));
-                    var tile_lsb: u8 = self.ppuRead(@as(u16, i) * 0x1000 + offset + row, false);
-                    var tile_msb: u8 = self.ppuRead(@as(u16, i) * 0x1000 + offset + row + 8, false);
-
-                    for (0..8) |col| {
-                        const pixel: u8 = (tile_lsb & 0x01) + (tile_msb & 0x01);
-
-                        tile_lsb >>= 1;
-                        tile_msb >>= 1;
-                        rl.imageDrawPixel(&self.sprite_pattern_table[i], @as(i32, tile_x) * 8 + (7 - @as(i32, @intCast(col))), @as(i32, tile_y) * 8 + @as(i32, row), self.getColourFromPaletteRam(palette, pixel));
-                    }
-                }
-            }
-        }
-
-        return self.sprite_pattern_table[i];
-    }
-
-    pub fn getColourFromPaletteRam(self: *@This(), palette: u8, pixel: u8) rl.Color {
+    pub fn getColourFromPaletteRam(self: *@This(), palette: u8, pixel: u8) Color {
         return self.palette_screen[self.ppuRead(0x3F00 + (@as(u16, palette) << 2) + pixel, false) & 0x3F];
     }
 

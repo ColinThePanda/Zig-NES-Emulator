@@ -108,7 +108,11 @@ pub fn main(init: std.process.Init) !void {
         rl.closeAudioDevice();
     };
 
-    const screen_texture = try rl.loadTextureFromImage(bus.ppu.sprite_screen);
+    // Create a 256x240 RGBA texture to stream the PPU framebuffer into each frame.
+    // (Previously this came from bus.ppu.sprite_screen, which now lives outside the core.)
+    const blank = rl.genImageColor(256, 240, rl.Color.black);
+    const screen_texture = try rl.loadTextureFromImage(blank);
+    rl.unloadImage(blank);
     defer rl.unloadTexture(screen_texture);
 
     while (!rl.windowShouldClose()) {

@@ -14,6 +14,7 @@ pub const Region = bus.Region;
 
 pub const ppu = @import("ppu.zig");
 pub const olc2C02 = ppu.olc2C02;
+pub const Color = ppu.Color;
 
 pub const cartridge = @import("cartridge.zig");
 pub const Cartridge = cartridge.Cartridge;
