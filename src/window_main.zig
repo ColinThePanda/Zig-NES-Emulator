@@ -97,19 +97,29 @@ pub fn main(init: std.process.Init) !void {
     });
 
     var stream: ?rl.AudioStream = null;
+    var audio_active = false;
     if (!args.mute) {
         rl.initAudioDevice();
-        rl.setAudioStreamBufferSizeDefault(chunk_frames);
-        stream = try rl.loadAudioStream(sample_rate, 16, 1);
-        rl.playAudioStream(stream.?);
+        if (!rl.isAudioDeviceReady()) {
+            std.log.warn("No audio device available; running without sound", .{});
+            rl.closeAudioDevice();
+        } else {
+            rl.setAudioStreamBufferSizeDefault(chunk_frames);
+            if (rl.loadAudioStream(sample_rate, 16, 1)) |s| {
+                stream = s;
+                rl.playAudioStream(s);
+                audio_active = true;
+            } else |err| {
+                std.log.warn("Failed to load audio stream ({s}); running without sound", .{@errorName(err)});
+                rl.closeAudioDevice();
+            }
+        }
     }
-    defer if (!args.mute) {
+    defer if (audio_active) {
         rl.unloadAudioStream(stream.?);
         rl.closeAudioDevice();
     };
 
-    // Create a 256x240 RGBA texture to stream the PPU framebuffer into each frame.
-    // (Previously this came from bus.ppu.sprite_screen, which now lives outside the core.)
     const blank = rl.genImageColor(256, 240, rl.Color.black);
     const screen_texture = try rl.loadTextureFromImage(blank);
     rl.unloadImage(blank);
@@ -131,10 +141,11 @@ pub fn main(init: std.process.Init) !void {
         bus.endAudioFrame();
 
         if (!args.mute) {
-            while (blip.blip_samples_avail(bus.blip_buf) >= chunk_frames and rl.isAudioStreamProcessed(stream.?)) {
+            while (blip.blip_samples_avail(bus.blip_buf) >= chunk_frames) {
+                if (audio_active and !rl.isAudioStreamProcessed(stream.?)) break;
                 var chunk: [chunk_frames]i16 = undefined;
                 const n = blip.blip_read_samples(bus.blip_buf, &chunk, chunk_frames, 0);
-                rl.updateAudioStream(stream.?, &chunk, n);
+                if (audio_active) rl.updateAudioStream(stream.?, &chunk, n);
             }
         }
 
