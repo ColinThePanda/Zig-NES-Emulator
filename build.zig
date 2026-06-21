@@ -85,4 +85,7 @@ pub fn build(b: *std.Build) void {
 
     const run_terminal_step = b.step("run-terminal", "Compile and run the text terminal emulator");
     run_terminal_step.dependOn(&run_terminal_cmd.step);
+
+    b.installArtifact(window_exe);
+    b.installArtifact(terminal_exe);
 }
