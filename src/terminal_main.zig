@@ -462,13 +462,25 @@ pub fn main(init: std.process.Init) !void {
     const frame_ns: u64 = @intFromFloat(@as(f64, std.time.ns_per_s) / @as(f64, @floatFromInt(fps)));
 
     var stream: ?rl.AudioStream = null;
+    var audio_active = false;
     if (!args.mute) {
         rl.initAudioDevice();
-        rl.setAudioStreamBufferSizeDefault(chunk_frames);
-        stream = try rl.loadAudioStream(sample_rate, 16, 1);
-        rl.playAudioStream(stream.?);
+        if (!rl.isAudioDeviceReady()) {
+            std.log.warn("no audio device available; running without sound", .{});
+            rl.closeAudioDevice();
+        } else {
+            rl.setAudioStreamBufferSizeDefault(chunk_frames);
+            if (rl.loadAudioStream(sample_rate, 16, 1)) |s| {
+                stream = s;
+                rl.playAudioStream(s);
+                audio_active = true;
+            } else |err| {
+                std.log.warn("failed to load audio stream ({s}); running without sound", .{@errorName(err)});
+                rl.closeAudioDevice();
+            }
+        }
     }
-    defer if (!args.mute) {
+    defer if (audio_active) {
         rl.unloadAudioStream(stream.?);
         rl.closeAudioDevice();
     };
@@ -494,7 +506,7 @@ pub fn main(init: std.process.Init) !void {
         bus.ppu.frame_complete = false;
         bus.endAudioFrame();
 
-        if (!args.mute) {
+        if (audio_active) {
             while (blip.blip_samples_avail(bus.blip_buf) >= chunk_frames and rl.isAudioStreamProcessed(stream.?)) {
                 var chunk: [chunk_frames]i16 = undefined;
                 const n = blip.blip_read_samples(bus.blip_buf, &chunk, chunk_frames, 0);
