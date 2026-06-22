@@ -16,7 +16,6 @@ const inesHeader = extern struct { // extern so fields are placed in memory in t
 pub const Mirror = enum { horizontal, vertical, onescreen_lo, onescreen_hi };
 
 pub const Cartridge = struct {
-    io: std.Io,
     allocator: std.mem.Allocator,
 
     image_valid: bool = true,
@@ -31,7 +30,7 @@ pub const Cartridge = struct {
 
     mirror: Mirror = .horizontal,
 
-    pub fn init(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !@This() {
+    pub fn initAlloc(allocator: std.mem.Allocator, io: std.Io, path: []const u8) !@This() {
         const file = try std.Io.Dir.cwd().openFile(io, path, .{});
         defer file.close(io);
 
@@ -50,7 +49,6 @@ pub const Cartridge = struct {
         const filetype: u8 = 1;
 
         var cartridge = @This(){
-            .io = io,
             .allocator = allocator,
             .mapper_id = mapper_id,
             .program_memory = undefined,
@@ -77,6 +75,58 @@ pub const Cartridge = struct {
             2 => {},
             else => {},
         }
+
+        switch (mapper_id) {
+            0, 1, 2, 3, 4, 66 => {
+                cartridge.mapper = try Mapper.init(mapper_id, cartridge.program_banks, cartridge.char_banks);
+            },
+            else => return error.UnsupportedMapper,
+        }
+
+        return cartridge;
+    }
+
+    pub fn initBytes(allocator: std.mem.Allocator, rom: []const u8) !@This() {
+        var pos: usize = 0;
+
+        if (rom.len < @sizeOf(inesHeader)) return error.InvalidRom;
+        var header: inesHeader = undefined;
+        @memcpy(std.mem.asBytes(&header), rom[pos..][0..@sizeOf(inesHeader)]);
+        pos += @sizeOf(inesHeader);
+
+        if (header.mapper1 & 0x04 != 0) pos += 512; // skip trainer
+
+        const mapper_id = ((header.mapper2 >> 4) << 4) | (header.mapper1 >> 4);
+
+        var cartridge = @This(){
+            .allocator = allocator,
+            .mapper_id = mapper_id,
+            .program_memory = undefined,
+            .char_memory = undefined,
+            .mapper = undefined,
+            .mirror = if (header.mapper1 & 0x01 != 0) .vertical else .horizontal,
+        };
+
+        const program_banks = header.program_rom_chunks;
+        const char_banks = header.char_rom_chunks;
+        const program_size = @as(usize, program_banks) * 16384;
+        const char_size: usize = if (char_banks == 0) 8192 else @as(usize, char_banks) * 8192;
+
+        if (pos + program_size > rom.len) return error.InvalidRom;
+        const program_memory = try allocator.alloc(u8, program_size);
+        @memcpy(program_memory, rom[pos..][0..program_size]);
+        pos += program_size;
+
+        const char_memory = try allocator.alloc(u8, char_size);
+        if (char_banks > 0) {
+            if (pos + char_size > rom.len) return error.InvalidRom;
+            @memcpy(char_memory, rom[pos..][0..char_size]);
+        }
+
+        cartridge.program_banks = program_banks;
+        cartridge.char_banks = char_banks;
+        cartridge.program_memory = program_memory;
+        cartridge.char_memory = char_memory;
 
         switch (mapper_id) {
             0, 1, 2, 3, 4, 66 => {
