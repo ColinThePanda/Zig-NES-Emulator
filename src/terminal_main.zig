@@ -445,7 +445,7 @@ pub fn main(init: std.process.Init) !void {
         _ = timeEndPeriod(1);
     };
 
-    var cart = try zig_nes_emu.Cartridge.init(init.gpa, init.io, args.rom_path);
+    var cart = try zig_nes_emu.Cartridge.initAlloc(init.gpa, init.io, args.rom_path);
     defer cart.deinit();
 
     var bus = zig_nes_emu.Bus.init(args.region, args.mute);
