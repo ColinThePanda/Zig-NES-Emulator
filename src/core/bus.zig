@@ -44,6 +44,12 @@ pub const Region = enum {
             .pal => .{ 4, 8, 14, 30, 60, 88, 118, 148, 188, 236, 354, 472, 708, 944, 1890, 3778 },
         };
     }
+    pub fn fps(self: Region) u32 {
+        return switch (self) {
+            .ntsc => 60,
+            .pal => 50,
+        };
+    }
 };
 
 pub const Bus = struct {

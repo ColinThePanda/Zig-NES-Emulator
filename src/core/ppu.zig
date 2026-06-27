@@ -220,7 +220,7 @@ pub const olc2C02 = struct {
                     const vram: u16 = @bitCast(self.vram_addr);
                     var data = self.ppu_data_buffer;
                     self.ppu_data_buffer = self.ppuRead(vram, false);
-                    if (@as(u16, vram) >= 0x3F00) data = self.ppu_data_buffer;
+                    if (vram >= 0x3F00) data = self.ppu_data_buffer;
                     self.vram_addr = @bitCast(vram +% (if (self.control.increment_mode == 1) @as(u16, 32) else @as(u16, 1)));
                     return data;
                 },
@@ -329,7 +329,8 @@ pub const olc2C02 = struct {
         } else if (address >= 0x2000 and address <= 0x3EFF) {
             address &= 0x0FFF;
 
-            if (self.cartridge.mirror == .vertical) {
+            const mir = self.cartridge.currentMirror();
+            if (mir == .vertical) {
                 if (address >= 0x0000 and address <= 0x03FF)
                     self.name_table[0][address & 0x03FF] = data;
                 if (address >= 0x0400 and address <= 0x07FF)
@@ -338,7 +339,7 @@ pub const olc2C02 = struct {
                     self.name_table[0][address & 0x03FF] = data;
                 if (address >= 0x0C00 and address <= 0x0FFF)
                     self.name_table[1][address & 0x03FF] = data;
-            } else if (self.cartridge.mirror == .horizontal) {
+            } else if (mir == .horizontal) {
                 if (address >= 0x0000 and address <= 0x03FF)
                     self.name_table[0][address & 0x03FF] = data;
                 if (address >= 0x0400 and address <= 0x07FF)
